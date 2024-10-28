@@ -25,8 +25,11 @@ from ghidra.program.model.data import (
     DataTypeConflictHandler,
     CategoryPath,
     VoidDataType,
+    StringDataType,
 )
+from ghidra.program.model.lang import OperandType
 from ghidra.program.model.symbol import RefType, SourceType
+
 
 try:
     from ghidra.ghidra_builtins import *  # noqa: F403
@@ -34,6 +37,8 @@ except:  # noqa: E722
     pass
 
 table = currentProgram.getSymbolTable()
+cm = currentProgram.getCodeManager()
+dtm = currentProgram.getDataTypeManager()
 
 
 def find_base_class_desc(symbol_path):
@@ -58,10 +63,6 @@ def main():
     if component_class is None:
         popup('Component base class not found :shrug:')
         return
-        
-
-    cm = currentProgram.getCodeManager()
-    dtm = currentProgram.getDataTypeManager()
 
     components_cat = dtm.createCategory(CategoryPath('/auto_structs/components'))\
         .getCategoryPath()
@@ -151,6 +152,8 @@ def main():
 
         data = analyze_function(func)
 
+        field_type = None
+
         for name, (offset, f) in data.items():
             f = f # type: Function
             param = f.getParameter(1)
@@ -179,7 +182,8 @@ def main():
             add_padding_if_needed(our_type, field_type, offset)
 
         our_type.setLength(int(ceil(our_type.getLength() / 4.0)) * 4)
-        add_padding_if_needed(our_type, field_type, our_type.getLength())
+        if field_type:
+            add_padding_if_needed(our_type, field_type, our_type.getLength())
         total += 1
 
     popup('Total: %d, components: %d' % (total, components))
@@ -208,49 +212,60 @@ def add_padding_if_needed(our_type, field_type, offset):
 
 
 def analyze_function(func):
-    # type: (Function) -> OrderedDict[str, (int, int)]
+    # type: (Function) -> OrderedDict[str, (int, Function)]
 
     field_info = OrderedDict()
 
     instructions = currentProgram.getListing().getInstructions(func.getBody(), True)
 
-    # Iterate through each instruction
     for instr in instructions:
-        for i in range(instr.getNumOperands()):
-            refs = instr.getOperandReferences(i)
-            for ref in refs:
-                if ref.getReferenceType() != RefType.DATA:
-                    continue
-                data = getDataAt(ref.getToAddress())
-                if data is None or not data.hasStringValue():
-                    continue
+        # look for MOV EDX, imm32
+        if instr.getMnemonicString() != "MOV":
+            continue
+        if not OperandType.isRegister(instr.getOperandType(0)):
+            continue
+        if instr.getOpObjects(0)[0].getName() != "EDX":
+            continue
+        if not OperandType.isScalar(instr.getOperandType(1)):
+            continue
+        ref = instr.getOperandReferences(1)[0]
+        if ref.getReferenceType() != RefType.DATA:
+            continue
 
-                # found a string literal
-                name = data.getValue()
+        # and get the data at that imm32
+        addr = ref.getToAddress()
+        data = getDataAt(addr)
 
-                # look for a LEA after that
-                lea_instr = instr.getNext()
-                offset = None
-                while lea_instr is not None:
-                    if lea_instr.getMnemonicString() == "LEA":
-                        offset = lea_instr.getOpObjects(1)[1]
-                        break
-                    lea_instr = lea_instr.getNext()
+        # handle strings that were untyped (<= 4 in length usually)
+        if data is None:
+            cm.createCodeUnit(addr, StringDataType(), -1)
+            data = getDataAt(addr)
 
-                # and for a call after that
-                call_instr = lea_instr.getNext() if lea_instr else None
-                func_addr = None
-                while call_instr is not None:
-                    if call_instr.getMnemonicString() == "CALL":
-                        func_addr = call_instr.getOpObjects(0)[0]
-                        break
-                    call_instr = call_instr.getNext()
+        field_name = data.getValue()
 
-                f = getFunctionAt(func_addr)
-                if not f:
-                    continue
+        # look for a LEA after that
+        lea_instr = instr.getNext()
+        offset = None
+        while lea_instr is not None:
+            if lea_instr.getMnemonicString() == "LEA":
+                offset = lea_instr.getOpObjects(1)[1]
+                break
+            lea_instr = lea_instr.getNext()
 
-                field_info[name] = (offset.getValue(), f)
+        if offset is None:
+            continue
+
+        # and for a call after that
+        call_instr = lea_instr.getNext() if lea_instr else None
+        f = None
+        while call_instr is not None:
+            if call_instr.getMnemonicString() == "CALL":
+                f = getFunctionAt(call_instr.getOpObjects(0)[0])
+                break
+            call_instr = call_instr.getNext()
+
+        if f is not None:
+            field_info[field_name] = (offset.getValue(), f)
 
     return field_info
 
