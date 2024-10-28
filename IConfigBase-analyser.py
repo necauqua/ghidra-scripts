@@ -159,10 +159,12 @@ def main():
             if param is None:
                 continue
 
-            param_type = param.getDataType() # type: PointerDB
-            if not isinstance(param_type, PointerDB):
-                continue
-            field_type = param_type.getDataType()
+            field_type = param.getDataType()
+            if isinstance(field_type, PointerDB):
+                # happy path, unwrap one reference layer
+                field_type = field_type.getDataType()
+            else:
+                field_type = Undefined1DataType()
 
             if Undefined.isUndefined(field_type):
                 printerr('%s.%s is untyped :shrug:' % (our_type.getName(), name))
