@@ -57,6 +57,7 @@ def main():
         'vec2': 'Vec2',
         'vec2i': 'Vec2i',
         'std::string': 'StdString',
+        'void *': 'RawPtr',
     }
 
     vec_re = re.compile('^vector<(.*?)>$')
