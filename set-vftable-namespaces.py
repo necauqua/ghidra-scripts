@@ -9,7 +9,7 @@
 # @runtime Jython
 
 from ghidra.program.model.symbol import SourceType
-
+from ghidra.program.model.data import PointerDataType, BooleanDataType
 try:
     from ghidra.ghidra_builtins import *  # noqa: F403
 except:  # noqa: E722
@@ -18,6 +18,7 @@ except:  # noqa: E722
 
 def main():
     cm = currentProgram.getCodeManager()
+    dtm = currentProgram.getDataTypeManager()
     table = currentProgram.getSymbolTable()
 
     monitor.setIndeterminate(True)
@@ -27,16 +28,41 @@ def main():
 
         data = cm.getDataAt(vftable.address)
 
-        destructor = getFunctionAt(data.getComponent(0).getValue())
-        if not skip(destructor, vftable, 0):
-            destructor.setParentNamespace(vftable.getParentNamespace())
-            destructor.setName('destroy', SourceType.ANALYSIS)
+        first = getFunctionAt(data.getComponent(0).getValue())
+        if not skip(first, vftable, 0):
+            first.setName('destroy', SourceType.ANALYSIS)
+            second_param = first.getParameter(1)
+            if second_param is not None:
+                second_param.setName('dealloc', SourceType.ANALYSIS)
+                second_param.setDataType(BooleanDataType(), SourceType.ANALYSIS)
 
-        for i in range(1, data.getNumComponents()):
+        for i in range(data.getNumComponents()):
             monitor.increment()
             func = getFunctionAt(data.getComponent(i).getValue())
-            if not skip(func, vftable, i):
-                func.setParentNamespace(vftable.getParentNamespace())
+            if skip(func, vftable, i):
+                continue
+
+            func.setParentNamespace(vftable.getParentNamespace())
+
+            # if func.getCallingConventionName() == "__thiscall":
+            #     func.setCustomVariableStorage(False)
+            #     continue
+
+            if func.getCallingConventionName() != "__fastcall" and func.getCallingConventionName() != "__thiscall":
+                continue
+            if not func.hasCustomVariableStorage():
+                continue
+
+            this_param = func.getParameter(0)
+            if this_param is None:
+                continue
+
+            this_param.setName("this", SourceType.ANALYSIS)
+
+            result = []
+            dtm.findDataTypes(vftable.getParentNamespace().getName(), result, True, monitor)
+            if len(result) == 1:
+                this_param.setDataType(PointerDataType(result[0]), SourceType.ANALYSIS)
 
 
 def skip(func, vftable, idx):
