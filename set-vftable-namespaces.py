@@ -47,10 +47,7 @@ def main():
             # if func.getCallingConventionName() == "__thiscall":
             #     func.setCustomVariableStorage(False)
             #     continue
-
-            if func.getCallingConventionName() != "__fastcall" and func.getCallingConventionName() != "__thiscall":
-                continue
-            if not func.hasCustomVariableStorage():
+            if func.getCallingConventionName() == '__thiscall' and not func.hasCustomVariableStorage():
                 continue
 
             this_param = func.getParameter(0)
