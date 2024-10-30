@@ -60,7 +60,7 @@ def main():
             this_param.setName("this", SourceType.ANALYSIS)
 
             result = []
-            dtm.findDataTypes(vftable.getParentNamespace().getName(), result, True, monitor)
+            dtm.findDataTypes(vftable.getParentNamespace().getName(True), result, True, monitor)
             if len(result) == 1:
                 this_param.setDataType(PointerDataType(result[0]), SourceType.ANALYSIS)
 
