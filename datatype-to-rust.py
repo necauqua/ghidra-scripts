@@ -58,6 +58,12 @@ def main():
         'vec2i': 'Vec2i',
         'std::string': 'StdString',
         'void *': 'RawPtr',
+
+        'undefined': 'u8',
+        'undefined1': 'u8',
+        'undefined2': 'u16',
+        'undefined4': 'u32',
+        'undefined8': 'u64',
     }
 
     vec_re = re.compile('^vector<(.*?)>$')
@@ -76,7 +82,7 @@ def main():
 
     to_snake = re.compile('(?<!^)(?=[A-Z])')    
 
-    result = '#[derive(FromBytes, IntoBytes, Debug)]\n'
+    result = '\n#[derive(FromBytes, IntoBytes, Debug)]\n'
     fields = []
     repack = False
     for component in the_type.getComponents():
@@ -96,7 +102,7 @@ def main():
                 fields[-1] = (prev_name, prev_tpe, prev_len)
                 continue
 
-        fields.append((name, rtpe, component.getLength()))
+        fields.append((name, tpe, rtpe, component.getLength()))
 
     if repack:
         result += '#[repr(C, packed(4))]\n'
@@ -106,23 +112,22 @@ def main():
     result += 'pub struct '
     result += the_type.getName()
     result += ' {\n'
-    for name, tpe, length in fields:
+    for name, tpe, rtpe, length in fields:
         if name.startswith('_'):
             result += '    '
         else:
             result += '    pub '
         result += name
         result += ': '
-        if tpe == 'undefined':
-            result += '[u8; '
-            result += hex(length)
-            result += '], // undefined\n'
-        elif tpe == 'Alignment':
+        if tpe.startswith('undefined'):
+            result += rtpe
+            result += ', // undefined\n'
+        elif rtpe == 'Alignment':
             result += '[u8; '
             result += hex(length)
             result += '], // padding\n'
         else:
-            result += tpe
+            result += rtpe
             result += ',\n'
     result += '}\nconst _: () = assert!(std::mem::size_of::<'
     result += the_type.getName()
