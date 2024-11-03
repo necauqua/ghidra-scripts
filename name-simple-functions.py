@@ -4,7 +4,7 @@
 # @author necauqua
 # @category _My Scripts
 # @keybinding
-# @menupath Scripts.Name simple functions
+# @menupath Scripts.Analyze noops
 # @toolbar
 # @runtime Jython
 
@@ -27,18 +27,12 @@ def analyze_function(f):
     # type: (Function) -> None
     global noops, identities
 
-    if f.getName() == '_noop':
-        noops += 1
-        return
-    if f.getName() == '_identity':
-        identities += 1
-        return
-
     instrs = listing.getInstructions(f.getBody(), True)
     instr = next(instrs) # type: Instruction
     if instr.getMnemonicString() == 'RET':
         f.setName('_noop', SourceType.ANALYSIS)
         f.setParentNamespace(currentProgram.getGlobalNamespace())
+        f.setInline(True)
         noops += 1
         return
 
@@ -51,6 +45,7 @@ def analyze_function(f):
             analyze_function(jump_to)
             # this will rename all thunks, not just noops/identities, 
             f.setName(jump_to.getName(), SourceType.ANALYSIS)
+            f.setInline(True)
 
         return
 
@@ -63,6 +58,7 @@ def analyze_function(f):
     if second.getMnemonicString() == 'RET' and str(instr) == 'MOV EAX,ECX':
         f.setName('_identity', SourceType.ANALYSIS)
         f.setParentNamespace(currentProgram.getGlobalNamespace())
+        f.setInline(True)
         identities += 1
 
 
