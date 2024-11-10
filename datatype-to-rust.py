@@ -96,10 +96,10 @@ def main():
         name = to_snake.sub('_', name).lower()
 
         if isinstance(component.getDataType(), AlignmentDataType):
-            prev_name, prev_tpe, prev_len = fields[-1]
+            prev_name, prev_tpe, prev_rtpe, prev_len = fields[-1]
             if prev_tpe == 'ByteBool':
                 prev_tpe = 'PadBool<' + str(component.getLength()) + '>'
-                fields[-1] = (prev_name, prev_tpe, prev_len)
+                fields[-1] = (prev_name, prev_tpe, prev_rtpe, prev_len)
                 continue
 
         fields.append((name, tpe, rtpe, component.getLength()))
