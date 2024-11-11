@@ -44,11 +44,10 @@ def main():
 
             func.setParentNamespace(vftable.getParentNamespace())
 
-            # if func.getCallingConventionName() == "__thiscall":
-            #     func.setCustomVariableStorage(False)
-            #     continue
-            if func.getCallingConventionName() == '__thiscall' and not func.hasCustomVariableStorage():
+            if func.getCallingConventionName() != '__thiscall':
                 continue
+
+            func.setCustomVariableStorage(True)
 
             this_param = func.getParameter(0)
             if this_param is None:
@@ -57,9 +56,12 @@ def main():
             this_param.setName("this", SourceType.ANALYSIS)
 
             result = []
-            dtm.findDataTypes(vftable.getParentNamespace().getName(True), result, True, monitor)
+            ns_name = vftable.getParentNamespace().getName(True)
+            dtm.findDataTypes(ns_name, result, True, monitor)
             if len(result) == 1:
                 this_param.setDataType(PointerDataType(result[0]), SourceType.ANALYSIS)
+            elif len(result) != 0:
+                printerr('Found multiple (%d) datatypes for %s' % (len(result), ns_name))
 
 
 def skip(func, vftable, idx):
