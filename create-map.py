@@ -42,14 +42,16 @@ def main():
     dialog.setStatusText('Choose the value type')
     tool.showDialog(dialog)
     value_type = dialog.getUserChosenDataType()
-    if value_type is None:
-        println('User chosen value type is null, probably cancelled')
-        return
 
     # ensure dir exists
-    category = dtm.createCategory(CategoryPath('/auto_structs/maps'))
+    category = dtm.createCategory(CategoryPath('/auto_structs/%ss' % ('map' if value_type else 'set')))
 
-    node_type = StructureDataType('map_node<' + key_type.getName() + ',' + value_type.getName() + '>', 0)
+    if value_type:
+        node_type = StructureDataType('map_node<%s,%s>' % (key_type.getName(), value_type.getName()), 0)
+    else:
+        println('User chosen value type is null, creating a set')
+        node_type = StructureDataType('set_node<%s>' % key_type.getName(), 0)
+
     node_type.setCategoryPath(category.getCategoryPath())
 
     ptr = PointerDataType(node_type)
@@ -58,16 +60,20 @@ def main():
     node_type.add(ptr, 'right', 'in root node this points to the largest node')
     node_type.add(Undefined4DataType(), 'meta', 'never figured out the meta exactly, red-black color, etc?.')
     node_type.add(key_type, 'key', '')
-    node_type.add(value_type, 'value', '')
 
-    map_type = StructureDataType('map<' + key_type.getName() + ',' + value_type.getName() + '>', 0)
-    map_type.setCategoryPath(category.getCategoryPath())
+    if value_type:
+        node_type.add(value_type, 'value', '')
+        coll_type = StructureDataType('map<%s,%s>' % (key_type.getName(), value_type.getName()), 0)
+    else:
+        coll_type = StructureDataType('set<%s>' % key_type.getName(), 0)
 
-    map_type.add(PointerDataType(node_type), 'root', '')
-    map_type.add(IntegerDataType(), 'len', '')
+    coll_type.setCategoryPath(category.getCategoryPath())
+
+    coll_type.add(PointerDataType(node_type), 'root', '')
+    coll_type.add(IntegerDataType(), 'len', '')
 
     dtm.addDataType(node_type, DataTypeConflictHandler.DEFAULT_HANDLER)
-    dtm.addDataType(map_type, DataTypeConflictHandler.DEFAULT_HANDLER)
+    dtm.addDataType(coll_type, DataTypeConflictHandler.DEFAULT_HANDLER)
 
 
 if __name__ == '__main__':
