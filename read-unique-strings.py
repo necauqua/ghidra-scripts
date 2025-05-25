@@ -25,7 +25,7 @@ def main():
         ref = instr.getPrimaryReference(0)
         data = ref and getDataAt(ref.getToAddress())
         data = data and data.getValue()
-        if isinstance(data, str) and data not in seen:
+        if isinstance(data, unicode) and data not in seen:
             seen.add(data)
             ordered.append(data)
         instr = instr.getNext()
